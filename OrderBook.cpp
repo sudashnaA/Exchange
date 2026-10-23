@@ -44,7 +44,7 @@ PriceLevel* OrderBook::getBestLevel(Side side)
 
 bool OrderBook::add(const Order& order)
 {
-	if (order.remaining == 0 or orders_.contains(order.orderId)) {
+	if (order.remaining == 0 or orders_.contains(order.orderId) or order.symbolId != symbol_) {
 		return false;
 	}
 
@@ -74,7 +74,15 @@ bool OrderBook::cancel(OrderId id)
 	
 	auto& info{ it->second };
 	auto& side{ getSide(info.side) };
-	side.at(info.price).cancel(id);
+
+	auto levelIt{ side.find(info.price) };
+
+	if (levelIt == side.end()) {
+		orders_.erase(id);
+		return false;
+	}
+
+	levelIt->second.cancel(id);
 
 	// remove info entry
 	orders_.erase(id);
@@ -84,21 +92,42 @@ bool OrderBook::cancel(OrderId id)
 
 Trades OrderBook::fill(Order& order)
 {
-	if (order.remaining == 0) {
+	if (order.remaining == 0 or order.symbolId != symbol_) {
 		return {};
 	}
 
-	auto* level{ getBestLevel(getOppositeSide(order.side)) };
+	Trades trades{};
 
-	if (!level or level->empty()) {
-		return {};
-	}
+	while (order.remaining > 0) {
+		auto* level{ getBestLevel(getOppositeSide(order.side)) };
 
-	auto trades{ level->fill(order) };
+		if (!level or level->empty()) {
+			return trades;
+		}
 
-	for (const auto& trade : trades) {
-		if (!level->contains(trade.passiveId)) {
-			orders_.erase(trade.passiveId);
+		auto bidPrice{ (order.side == Side::Buy) ? order.price : level->price() };
+		auto askPrice{ (order.side == Side::Buy) ? level->price() : order.price };
+
+		if (bidPrice < askPrice) {
+			return trades;
+		}
+
+		auto newTrades{ level->fill(order) };
+
+		for (auto& trade : newTrades) {
+			if (!level->contains(trade.passiveId)) {
+				orders_.erase(trade.passiveId);
+			}
+
+			trades.push_back(std::move(trade));
+		}
+
+		if (level->empty()) {
+			getSide(getOppositeSide(order.side)).erase(level->price());
+		}
+
+		if (newTrades.empty()) {
+			break;
 		}
 	}
 
@@ -110,34 +139,51 @@ std::optional<Price> OrderBook::bestPrice(Side side) const
 	return getBestPrice(side);
 }
 
-Quantity OrderBook::fillableQuantity(Side side, Price limit) const
+bool OrderBook::canFillFOK(const Order& order) const
 {
+	if (order.remaining == 0 or order.symbolId != symbol_) {
+		return false;
+	}
+
 	Quantity quantity{};
 
-	if (side == Side::Sell) {
+	if (order.side == Side::Sell) {
 		// A sell order matches against Bids >= limit.
 		// Since bids_ is sorted ascending, everything from lower_bound(limit) onwards is >= limit.
-		auto it{ bids_.lower_bound(limit) };
+		auto it{ bids_.lower_bound(order.price) };
 
 		for (; it != bids_.end(); ++it) {
 			quantity += it->second.totalQuantity();
+		}
+
+		if (quantity >= order.remaining) {
+			return true;
 		}
 	}
 	else {
 		// A buy order matches against Asks <= limit.
 		// Since asks_ is sorted ascending, everything from begin() up to upper_bound(limit) is <= limit.
-		auto endIt{ asks_.upper_bound(limit) };
+		auto endIt{ asks_.upper_bound(order.price) };
 
 		for (auto it{ asks_.begin() }; it != endIt; ++it) {
 			quantity += it->second.totalQuantity();
 		}
+
+		if (quantity >= order.remaining) {
+			return true;
+		}
 	}
 
-	return quantity;
+	return false;
 }
 
 bool OrderBook::empty(Side side) const
 {
 	auto& bookSide{ getSide(side) };
 	return bookSide.empty();
+}
+
+bool OrderBook::contains(OrderId id) const 
+{
+	return orders_.contains(id);
 }

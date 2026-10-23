@@ -53,7 +53,7 @@ struct Trade {
 
 using Trades = std::vector<Trade>;
 
-Trade makeTrade(Order& aggressor, Order& passive) {
+inline Trade makeTrade(Order& aggressor, Order& passive) {
     const auto filled{ std::min(aggressor.remaining, passive.remaining) };
 
     aggressor.remaining -= filled;
@@ -72,6 +72,6 @@ Trade makeTrade(Order& aggressor, Order& passive) {
     };
 }
 
-Side getOppositeSide(Side side) {
+inline Side getOppositeSide(Side side) {
     return (side == Side::Buy) ? Side::Sell : Side::Buy;
 }
