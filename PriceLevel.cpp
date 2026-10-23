@@ -12,28 +12,30 @@ bool PriceLevel::push_back(const Order& order)
 	return true;
 }
 
-Quantity PriceLevel::fill(Quantity amount)
+Trades PriceLevel::fill(Order& orderToBeFilled)
 {
-	if (amount == 0) {
-		return 0;
+	if (orderToBeFilled.remaining == 0) {
+		return {};
 	}
 
-	while (!empty() and amount > 0) {
-		auto& order{ *level_.begin() };
-		
-		Quantity filled{ std::min(amount, order.remaining) };
+	Trades trades{};
 
-		order.remaining -= filled;
-		amount -= filled;
-		totalQuantity_ -= filled;
+	while (!empty() and orderToBeFilled.remaining > 0) {
+		auto& order{ *level_.begin() };
+
+		trades.push_back(makeTrade(orderToBeFilled, order));
+		totalQuantity_ -= trades.back().quantity;
 
 		if (order.remaining == 0) {
 			orders_.erase(order.orderId);
 			level_.erase(level_.begin());
 		}
+		if (orderToBeFilled.remaining == 0) {
+			break;
+		}
 	}
 
-	return amount;
+	return trades;
 }
 
 bool PriceLevel::cancel(OrderId id) {

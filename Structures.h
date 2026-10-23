@@ -33,6 +33,7 @@ struct Order {
     Quantity       originalQuantity{};
     SequenceNumber sequenceNumber{};
     UserId         userId{};
+    SymbolId       symbolId{};
 
     // enum go after
     Side           side{};
@@ -49,3 +50,28 @@ struct Trade {
     SymbolId symbol{};
     Side aggressorSide{};
 };
+
+using Trades = std::vector<Trade>;
+
+Trade makeTrade(Order& aggressor, Order& passive) {
+    const auto filled{ std::min(aggressor.remaining, passive.remaining) };
+
+    aggressor.remaining -= filled;
+    passive.remaining -= filled;
+
+    return {
+        0,
+        aggressor.orderId,
+        passive.orderId,
+        aggressor.userId,
+        passive.userId,
+        passive.price,
+        filled,
+        aggressor.symbolId,
+        aggressor.side,
+    };
+}
+
+Side getOppositeSide(Side side) {
+    return (side == Side::Buy) ? Side::Sell : Side::Buy;
+}

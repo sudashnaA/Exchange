@@ -27,21 +27,27 @@ private:
 	PriceLevel* getBestLevel(Side side);
 
 public:
-	bool insert(const Order& order);
+	bool add(const Order& order);
+
 	bool cancel(OrderId id);
 
-	Quantity fillBest(Side side, Quantity amount);
+	Trades fill(Order& order);
+
 	std::optional<Price> bestPrice(Side side) const;
 
-	Quantity volumeAtPriceOrBetter(Side side, Price limit) const;
+	// Use for FOK
+	Quantity fillableQuantity(Side side, Price limit) const;
+
 	bool empty(Side side) const;
 
 	std::size_t totalQuantity() const;
+
 	Quantity quantity(Side side) const;
+
 	Quantity quantityAt(Side side, PriceLevel level) const;
+
 	std::size_t levelCount(Side side) const;
 
-	// simple stuff
-	bool contains(OrderId id) const { return orders_.contains(id); };
+	bool contains(OrderId id) const;
 };
 

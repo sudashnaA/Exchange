@@ -29,7 +29,7 @@ public:
 	bool push_back(const Order& order);
 
 	// return amount remaining
-	Quantity fill(Quantity amount);
+	Trades fill(Order& order);
 
 	bool cancel(OrderId id);
 
