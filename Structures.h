@@ -1,5 +1,7 @@
 #pragma once
 #include <cstdint>
+#include <vector>
+#include <optional>
 
 enum class Side : std::uint8_t { Buy, Sell };
 enum class OrderType : std::uint8_t { Limit, Market };
@@ -12,6 +14,9 @@ using SequenceNumber = std::uint64_t;
 using SymbolId = std::uint64_t;
 using UserId = std::uint64_t;
 
+inline constexpr SequenceNumber SEQUENCE_NUMBER_UNINITALIZED{ 0 };
+inline constexpr SequenceNumber STARTING_SEQUENCE_NUMBER{ 1 };
+
 struct NewOrder {
     OrderId     id{};
     Price       price{};
@@ -20,9 +25,9 @@ struct NewOrder {
     SymbolId    symbol{};
 
     // enum go after
+    std::optional<TimeInForce> tif{};
     Side        side{};
     OrderType   type{};
-    TimeInForce tif{};
 };
 
 // resting orders
@@ -60,7 +65,7 @@ inline Trade makeTrade(Order& aggressor, Order& passive) {
     passive.remaining -= filled;
 
     return {
-        0,
+        SEQUENCE_NUMBER_UNINITALIZED,
         aggressor.orderId,
         passive.orderId,
         aggressor.userId,
@@ -74,4 +79,18 @@ inline Trade makeTrade(Order& aggressor, Order& passive) {
 
 inline Side getOppositeSide(Side side) {
     return (side == Side::Buy) ? Side::Sell : Side::Buy;
+}
+
+inline Order convertOrder(const NewOrder& newOrder, SequenceNumber sequenceNumber)
+{
+    return Order{
+        .orderId = newOrder.id,
+        .price = newOrder.price,
+        .remaining = newOrder.quantity,
+        .originalQuantity = newOrder.quantity,
+        .sequenceNumber = sequenceNumber,
+        .userId = newOrder.userId,
+        .symbolId = newOrder.symbol,
+        .side = newOrder.side
+    };
 }
